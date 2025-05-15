@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>カスタムルーレット</title>
+  <style>
+    body {font-family:sans-serif;text-align:center;margin:0;padding:1.5rem;background:#f7f7f7;}
+    #container {display:flex;flex-direction:column;align-items:center;gap:1rem;max-width:600px;margin:auto;}
+    #wheel-wrapper {position:relative;width:400px;height:400px;}
+    #wheel {width:100%;height:100%;border-radius:50%;border:4px solid #333;transition:transform 4s cubic-bezier(0.33,1,0.68,1);}
+    #pointer {width:0;height:0;border-left:20px solid transparent;border-right:20px solid transparent;border-bottom:30px solid #e74c3c;position:absolute;top:-30px;left:calc(50% - 20px);}
+    button, input {font-size:1rem;}
+    button {padding:0.5rem 1rem;cursor:pointer;border:none;border-radius:6px;background:#3498db;color:#fff;}
+    button:hover {filter:brightness(1.1);} 
+    form {display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;}
+    input[type=text],input[type=number]{padding:0.4rem;border:1px solid #ccc;border-radius:4px;width:8rem;}
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="wheel-wrapper">
+      <canvas id="wheel" width="400" height="400"></canvas>
+      <div id="pointer"></div>
+    </div>
+    <button id="spin">SPIN!</button>
+
+    <form id="addForm">
+      <input id="labelInput" type="text" placeholder="選択肢ラベル" required>
+      <input id="weightInput" type="number" placeholder="%" min="1" max="100" required>
+      <button type="submit">追加</button>
+    </form>
+  </div>
+
+  <script>
+  // ======== 初期選択肢をここで定義 ============
+  // label: 表示名, weight: 出現確率(%)
+  let choices = [
+    { label: 'A', weight: 30 },
+    { label: 'B', weight: 30 },
+    { label: 'C', weight: 40 }
+  ];
+  //=============================================
+
+  const canvas = document.getElementById('wheel');
+  const ctx = canvas.getContext('2d');
+  let currentRotation = 0;   // 累積回転角[deg]
+
+  // ルーレットを描画
+  function drawWheel() {
+    const totalWeight = choices.reduce((sum, c) => sum + c.weight, 0);
+    let startAngle = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    choices.forEach((choice, i) => {
+      const sliceAngle = (choice.weight / totalWeight) * 2 * Math.PI;
+      // セクター
+      ctx.beginPath();
+      ctx.moveTo(200, 200);
+      ctx.arc(200, 200, 200, startAngle, startAngle + sliceAngle);
+      ctx.closePath();
+      ctx.fillStyle = `hsl(${i * 360 / choices.length}, 80%, 60%)`;
+      ctx.fill();
+      ctx.stroke();
+      // ラベル
+      ctx.save();
+      ctx.translate(200, 200);
+      ctx.rotate(startAngle + sliceAngle / 2);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(choice.label, 190, 10);
+      ctx.restore();
+      startAngle += sliceAngle;
+    });
+  }
+  drawWheel();
+
+  // 重み付きランダム選択
+  function weightedRandom() {
+    const total = choices.reduce((s, c) => s + c.weight, 0);
+    let r = Math.random() * total;
+    for (const c of choices) {
+      if (r < c.weight) return c;
+      r -= c.weight;
+    }
+  }
+
+  // ======== スピン処理 ==========
+  document.getElementById('spin').addEventListener('click', () => {
+    const selected = weightedRandom();
+    const totalWeight = choices.reduce((s, c) => s + c.weight, 0);
+    let start = 0, end = 0;
+    for (const c of choices) {
+      const slice = (c.weight / totalWeight) * 360;
+      if (c === selected) {
+        end = start + slice;
+        break;
+      }
+      start += slice;
+    }
+    // ポインタがスライス中央に来るよう任意角を決定
+    const targetAngle = start + Math.random() * (end - start);
+    const spins = 3; // 追加回転数
+    const finalRotation = currentRotation + spins * 360 + (360 - targetAngle);
+    currentRotation = finalRotation;
+    canvas.parentElement.style.transform = `rotate(${currentRotation}deg)`;
+    setTimeout(() => alert(`結果: ${selected.label}`), 4000);
+  });
+
+  // ======== 新規選択肢追加 ==========
+  document.getElementById('addForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const label = document.getElementById('labelInput').value.trim();
+    const weight = parseFloat(document.getElementById('weightInput').value);
+    if (label && weight > 0) {
+      choices.push({ label, weight });
+      document.getElementById('labelInput').value = '';
+      document.getElementById('weightInput').value = '';
+      drawWheel();
+    }
+  });
+  </script>
+</body>
+</html>
